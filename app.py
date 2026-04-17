@@ -13,6 +13,7 @@ from datetime import datetime
 from openai import AzureOpenAI
 
 # Auto-create database if it doesn't exist
+DB_PATH = "impowr_demo.db"
 import subprocess
 if not os.path.exists(DB_PATH):
     subprocess.run(["python", "setup_database.py"])
