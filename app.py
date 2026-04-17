@@ -4,6 +4,7 @@ A natural language to SQL prototype for the SimonAIThon hackathon.
 
 Run with: streamlit run app.py
 """
+import time
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -284,21 +285,33 @@ def get_db_connection():
     return conn
 
 
-def call_azure_openai(messages):
-    """Call Azure OpenAI API."""
+def call_azure_openai(messages, max_retries=3):
+    """Call Azure OpenAI with retry logic for rate limits."""
     client = AzureOpenAI(
         azure_endpoint=AZURE_ENDPOINT,
         api_key=AZURE_API_KEY,
         api_version=AZURE_API_VERSION,
     )
-    response = client.chat.completions.create(
-        model=AZURE_DEPLOYMENT,
-        messages=messages,
-        temperature=0.0,
-        max_tokens=1000,
-    )
-    return response.choices[0].message.content.strip()
-
+ 
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=AZURE_DEPLOYMENT,
+                messages=messages,
+                temperature=0.0,
+                max_tokens=1000,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            error_str = str(e).lower()
+            if "rate" in error_str or "429" in error_str or "too many" in error_str:
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 3  # 3s, 6s, 9s
+                    time.sleep(wait_time)
+                    continue
+            raise e
+ 
+    raise Exception("Service busy. Please wait a moment and try again.")
 
 def generate_sql(question):
     """Convert natural language question to SQL."""
